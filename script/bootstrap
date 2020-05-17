@@ -1,0 +1,28 @@
+#!/bin/bash
+
+function main
+{
+    local -r _DIR=$(cd "$(dirname "$0")/.." && pwd -P)
+
+    if md5sum --quiet -c /tmp/installed.md5 ; then
+        return
+    fi
+
+    echo "Installing prerequites..."
+    if which pip3 >& /dev/null ; then
+        sudo apt install python3-pip python-mysqldb libmariadbclient-dev
+    fi
+
+    pip3 install -r "${_DIR}/requirements.txt"
+
+    if ! [ -f example.com+4.pem ] || ! [ -f example.com+4-key.pem ] ; then
+        echo "-------------------------------------------------------------------------------"
+        echo "Please generate keys/cert for SSL."
+        echo "https://kifarunix.com/how-to-create-self-signed-ssl-certificate-with-mkcert-on-ubuntu-18-04/"
+        echo "-------------------------------------------------------------------------------"
+    fi
+
+    md5sum "${_DIR}/requirements.txt" "${_DIR}/script/bootstrap" > /tmp/installed.md5
+}
+
+main

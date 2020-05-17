@@ -1,0 +1,4 @@
+database.env
+__pycache__
+*.pem
+.*.sw?

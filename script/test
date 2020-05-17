@@ -1,0 +1,85 @@
+#!/bin/bash
+
+function main
+{
+    local -r _DIR=$(cd "$(dirname "$0")/.." && pwd -P)
+
+    "${_DIR}/script/bootstrap"
+
+    echo "Running server..."
+    # SSL: https://stackoverflow.com/questions/56732578/ssl-implementation-with-starlette-in-docker
+    local -r SSL_OPTIONS=(--port 5000 "--ssl-keyfile=${_DIR}/example.com+4-key.pem" "--ssl-certfile=${_DIR}/example.com+4.pem")
+    uvicorn apirest:app "${SSL_OPTIONS[@]}" & # with SSL
+    #uvicorn apirest:app # no SSL
+
+    "${_DIR}/script/open_other_terminal.sh"
+    cat << EOF > /tmp/terminal
+echo
+echo
+sleep 1 # server needs time to be ready
+source "${_DIR}/script/open_other_terminal.env"
+
+echo "##################################"
+echo "###### OK expected"
+
+curl -s -i https://localhost:5000/ | displayLastResult "HOME" grep -q OK
+
+curl -s -i https://Richard:testpwd@localhost:5000/friends | displayLastResult "Richard's friends" grep -q toto
+
+curl -s -XPOST https://localhost:5000/users/register -d '{"username": "test", "email": "test@tester.com", "password": "testpwd"}' -H "Content-Type: application/json" | displayLastResult "register test" grep -q test
+
+curl -s https://test:testpwd@localhost:5000/friends | displayLastResult "new user has no friend" bash -c 'tr "[" "a" | tr "]" "b" | grep -q ab' # grep [] does not work as intented
+
+curl -s -i https://test:testpwd@localhost:5000/friends | displayLastResult "test's friends" grep -q '200 OK' # login=test pwd=testpwd 
+# token flow: http://lovelysystems.github.io/lovely.microblog/be_authentication.html
+
+curl -s -XPOST https://test:testpwd@localhost:5000/friends -d '{"name": "random friend", "genre": "M", "birthdate": "2020-05-14"}' -H "Content-Type: application/json" | displayLastResult "add first friend" grep -q "birthdate"
+
+curl -s -i https://test:testpwd@localhost:5000/friends | displayLastResult "check the friend" grep -q "random friend"
+
+curl -s -XDELETE https://test:testpwd@localhost:5000/friends/random%20friend -H "Content-Type: application/json" #| displayLastResult "delete friend" grep -q '"code":"0"'
+
+curl -s -i https://test:testpwd@localhost:5000/friends | displayLastResult "random is no longer a friend" bash -c 'tr "[" "a" | tr "]" "b" | grep -q ab'
+
+curl -s -XPOST https://test:testpwd@localhost:5000/friends -d '{"name": "other random friend", "genre": "M", "birthdate": "2020-05-14"}' -H "Content-Type: application/json" | displayLastResult "add second friend" grep -q "birthdate"
+
+curl -s -c /tmp/cookie -XPOST https://test:testpwd@localhost:5000/users/login | displayLastResult "login to get token" grep -q "success"
+
+curl -s -c /tmp/cookie -b /tmp/cookie https://localhost:5000/friends | displayLastResult "query using token" grep -q "random friend"
+
+curl -s -i /tmp/cookie -b /tmp/cookie https://localhost:5000/users/logout | displayLastResult "logout" grep -q "200 OK"
+
+echo "##################################"
+echo "###### checking for errors (see https://www.restapitutorial.com/lessons/httpmethods.html)"
+
+curl -i http://localhost:5000/friends |& displayLastResult "NOT https" grep -q "Empty reply from server"
+
+curl -s -i -b /tmp/cookie https://localhost:5000/friends |& displayLastResult "No cookie/logged out"  grep -q "403 Forbidden"
+
+curl -s -i -XDELETE https://test:fakepwd@localhost:5000/users |& displayLastResult "Unauthorized delete" grep -q "401 Unauthorized"
+
+curl -s -i https://localhost:5000/friends | displayLastResult "Forbidden" grep -q "403 Forbidden"
+
+curl -s -i https://unknown:pwd@localhost:5000/friends | displayLastResult "wrong login" grep -q "401 Unauthorized"
+
+curl -s -i https://test:fakepwd@localhost:5000/friends | displayLastResult "wrong pwd" grep -q "401 Unauthorized"
+
+curl -s -i -XPOST https://localhost:5000/users/register -d '{"username": "test", "email": "test@tester.com", "password": "testpwd"}' -H "Content-Type: application/json" | displayLastResult "already registered" grep -q "409 Conflict"
+
+curl -s -i -XPOST https://test:testpwd@localhost:5000/friends -d '{"name": "other random friend", "genre": "F", "birthdate": "2020-05-14"}' -H "Content-Type: application/json" | displayLastResult "already friend" grep -q "409 Conflict"
+
+curl -s -i -XPOST https://test:wrongpwd@localhost:5000/users/login | displayLastResult "wrong pwd to login" grep -q "401 Unauthorized"
+
+curl -s -i https://localhost:5000/friends | displayLastResult "still forbidden" grep -q "403 Forbidden"
+
+echo "##################################"
+echo "###### CLEANUP"
+curl -s -XDELETE https://test:testpwd@localhost:5000/users | displayLastResult "del test" grep -q "success"
+
+
+EOF
+
+    wait
+}
+
+main

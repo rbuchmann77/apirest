@@ -1,0 +1,11 @@
+#aiosqlite
+#aiomysql
+#databases
+mysqlclient
+starlette
+sqlalchemy
+uvicorn
+starlette-auth-toolkit
+pyJWT # not jwt!
+passlib
+orm
