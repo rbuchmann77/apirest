@@ -33,6 +33,8 @@ Some ideas/personal questions:
 - Is "starlette.testclient" worth? Better than curl/bash tests?
 - Is sqlalchemy worth?
 
+I did this project to learn python. I tried to apply best practices but, well, it was learned/done in few weeks. 
+
 ### Contribution guidelines ###
 
 - Writing tests
