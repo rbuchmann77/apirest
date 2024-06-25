@@ -9,3 +9,4 @@ starlette-auth-toolkit
 pyJWT # not jwt!
 passlib
 orm
+anyio>=4.4.0 # not directly required, pinned by Snyk to avoid a vulnerability
